@@ -76,7 +76,7 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
     <div className="relative w-24 bg-gray-50 border-l-2 border-gray-300 h-screen overflow-y-auto shadow-lg">
       {/* Real-time date display on hover - positioned adjacent to timeline */}
       {hoveredDate && (
-        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-full z-30 pointer-events-none">
+        <div className="fixed right-32 top-1/2 transform -translate-y-1/2 z-30 pointer-events-none">
           <div className="bg-gray-700 text-white px-2 py-1 rounded text-sm font-medium whitespace-nowrap shadow-lg">
             {new Date(hoveredDate).toLocaleDateString('en-US', {
               month: '2-digit',
