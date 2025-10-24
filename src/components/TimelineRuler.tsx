@@ -63,10 +63,10 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
     const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
 
     if (daysDiff <= 5) {
-      // More dramatic magnification: closer = much more magnification
-      // Target: middle bar should be 150px tall (baseHeight = 8px, so need ~18.75x magnification)
-      const maxMagnification = 18.75; // 150px / 8px base height
-      return 1 + (5 - daysDiff) * (maxMagnification - 1) / 5; // 1x to 18.75x magnification
+      // More realistic magnification: closer = more magnification
+      // Target: middle bar should be 75px tall (baseHeight = 8px, so need ~9.375x magnification)
+      const maxMagnification = 9.375; // 75px / 8px base height
+      return 1 + (5 - daysDiff) * (maxMagnification - 1) / 5; // 1x to 9.375x magnification
     }
 
     return 1; // No magnification outside 5-day window
@@ -123,7 +123,7 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
               className="relative group cursor-pointer transition-all duration-700 ease-in-out"
               style={{
                 height: `${magnifiedHeight}px`,
-                marginBottom: index < sortedEntries.length - 1 ? `${(magnification - 1) * 4}px` : '0px'
+                marginBottom: index < sortedEntries.length - 1 ? '4px' : '0px'
               }}
               onClick={() => {
                 setFocusDate(entry.date);
