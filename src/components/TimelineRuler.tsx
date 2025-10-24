@@ -11,7 +11,13 @@ interface TimelineRulerProps {
 
 export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerProps) {
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const [focusDate, setFocusDate] = useState<string | null>(currentDate || null); // Initialize with current date
+  // Set a default focus point in the middle of the timeline to pre-calculate extents
+  const [focusDate, setFocusDate] = useState<string | null>(() => {
+    const activeEntries = data.entries.filter(entry => entry.entryCount > 0);
+    const sortedEntries = [...activeEntries].sort((a, b) => b.date.localeCompare(a.date));
+    const middleIndex = Math.floor(sortedEntries.length / 2);
+    return sortedEntries[middleIndex]?.date || currentDate || null;
+  });
 
   // Calculate max entry count for scaling
   const maxEntries = Math.max(...data.entries.map(entry => entry.entryCount));
@@ -51,7 +57,7 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
   // Sort by date (newest first for bottom-to-top layout)
   const sortedEntries = [...activeEntries].sort((a, b) => b.date.localeCompare(a.date));
 
-  // Calculate magnification based on focus date
+  // Calculate magnification based on focus date - algorithmic growth from focus outward
   const getMagnificationFactor = (entryDate: string, focusDate: string | null): number => {
     if (!focusDate) return 1;
 
@@ -63,53 +69,56 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
     const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
 
     if (daysDiff <= 5) {
-      // More realistic magnification: closer = more magnification
-      // Target: middle bar should be 75px tall (baseHeight = 8px, so need ~9.375x magnification)
-      const maxMagnification = 9.375; // 75px / 8px base height
-      return 1 + (5 - daysDiff) * (maxMagnification - 1) / 5; // 1x to 9.375x magnification
+      // Exaggerated magnification: focus point gets much larger, then decreases outward
+      const maxMagnification = 6; // 6x magnification at focus point (twice as wide as adjacent)
+      const distanceFactor = daysDiff / 5; // 0 to 1, where 0 is focus point
+      return 1 + (maxMagnification - 1) * (1 - distanceFactor); // 6x at focus, 1x at edge
     }
 
     return 1; // No magnification outside 5-day window
   };
 
-  // Calculate offset to keep focus point stable
-  const getFocusOffset = (entryDate: string, focusDate: string | null): number => {
+  // Calculate timeline offset to keep focus point under mouse
+  const getTimelineOffset = (focusDate: string | null): number => {
     if (!focusDate) return 0;
     
-    const entryTime = new Date(entryDate).getTime();
-    const focusTime = new Date(focusDate).getTime();
+    const focusIndex = sortedEntries.findIndex(entry => entry.date === focusDate);
+    if (focusIndex === -1) return 0;
     
-    // If this is the focus point, no offset
-    if (entryDate === focusDate) return 0;
+    let totalOffset = 0;
+    const baseHeight = 8;
     
-    // Calculate how much this entry should be offset to keep focus stable
-    const timeDiff = entryTime - focusTime;
-    const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
-    
-    // Only apply offset to entries within the magnification window
-    if (Math.abs(daysDiff) <= 5) {
-      const magnification = getMagnificationFactor(entryDate, focusDate);
-      const baseHeight = 8;
-      const magnifiedHeight = baseHeight * magnification;
-      const extraHeight = magnifiedHeight - baseHeight;
-      
-      // If this entry is before the focus point, push it up
-      if (timeDiff > 0) {
-        return -extraHeight / 2;
-      } else {
-        // If this entry is after the focus point, push it down
-        return extraHeight / 2;
-      }
+    // Calculate how much extra height was added by entries before the focus point
+    for (let i = 0; i < focusIndex; i++) {
+      const entry = sortedEntries[i];
+      const magnification = getMagnificationFactor(entry.date, focusDate);
+      const extraHeight = (baseHeight * magnification) - baseHeight;
+      totalOffset += extraHeight;
     }
     
-    return 0;
+    // Add half the focus point's own growth to center it under mouse
+    const focusMagnification = getMagnificationFactor(focusDate, focusDate);
+    const focusExtraHeight = (baseHeight * focusMagnification) - baseHeight;
+    totalOffset += focusExtraHeight / 2;
+    
+    // Also account for entries after focus point that might be pushing it up
+    // This prevents bars 1-4 from going off-screen when clicking bars 5+
+    for (let i = focusIndex + 1; i < sortedEntries.length; i++) {
+      const entry = sortedEntries[i];
+      const magnification = getMagnificationFactor(entry.date, focusDate);
+      const extraHeight = (baseHeight * magnification) - baseHeight;
+      totalOffset -= extraHeight / 2; // Half the extra height pushes focus up
+    }
+    
+    // Return negative offset to move timeline up, keeping focus under mouse
+    return -totalOffset;
   };
 
   return (
-    <div className="relative w-24 bg-gray-50 border-l-2 border-gray-300 h-screen overflow-y-auto shadow-lg">
+    <div className="relative w-48 bg-gray-50 border-l-2 border-gray-300 h-screen overflow-y-auto shadow-lg">
       {/* Real-time date display on hover - positioned adjacent to timeline */}
       {hoveredDate && (
-        <div className="fixed right-32 top-1/2 transform -translate-y-1/2 z-30 pointer-events-none">
+        <div className="fixed right-56 top-1/2 transform -translate-y-1/2 z-30 pointer-events-none">
           <div className="bg-gray-700 text-white px-2 py-1 rounded text-sm font-medium whitespace-nowrap shadow-lg">
             {new Date(hoveredDate).toLocaleDateString('en-US', {
               month: '2-digit',
@@ -139,14 +148,19 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
         ))}
       </div>
 
-      <div className="p-0.5 space-y-0 pl-4">
+      <div 
+        className="p-0.5 space-y-0 pl-8 transition-all duration-700 ease-in-out"
+        style={{
+          // Keep bars 1-2 visible with 20px offset, plus focus compensation
+          transform: `translateY(${70 + getTimelineOffset(focusDate)}px)`
+        }}
+      >
         {sortedEntries.map((entry, index) => {
           const magnification = getMagnificationFactor(entry.date, focusDate);
           const isCurrent = currentDate === entry.date;
           const isHovered = hoveredDate === entry.date;
           const entryIsRecent = isRecent(entry.date);
           const isFocusPoint = focusDate === entry.date;
-          const focusOffset = getFocusOffset(entry.date, focusDate);
 
           // Calculate bar dimensions with magnification
           const baseHeight = 8;
@@ -158,9 +172,8 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
               className="relative group cursor-pointer transition-all duration-700 ease-in-out"
               style={{
                 height: `${magnifiedHeight}px`,
-                marginBottom: index < sortedEntries.length - 1 ? '4px' : '0px',
-                // Apply offset to keep focus point stable
-                transform: `translateY(${focusOffset}px)`
+                marginBottom: index < sortedEntries.length - 1 ? '4px' : '0px'
+                // No transforms - just height changes for clean magnification
               }}
               onClick={() => {
                 setFocusDate(entry.date);
@@ -188,6 +201,11 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
                     marginLeft: 'auto'
                   }}
                 />
+              </div>
+
+              {/* Bar number for debugging */}
+              <div className="absolute -left-6 top-1/2 transform -translate-y-1/2 text-xs font-bold text-gray-600 bg-white px-1 rounded">
+                {index + 1}
               </div>
 
               {/* Date label (show on hover) */}

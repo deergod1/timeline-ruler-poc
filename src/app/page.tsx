@@ -41,7 +41,7 @@ export default function Home() {
     <div className="flex h-screen bg-white">
       {/* Main content area */}
       <div className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-2xl mx-auto">
           <h1 className="text-3xl font-bold mb-8">Timeline Ruler POC - Step 3</h1>
 
           <div className="bg-gray-100 p-6 rounded-lg mb-6 border">
@@ -77,7 +77,7 @@ export default function Home() {
       </div>
 
       {/* Timeline ruler - fixed to right side */}
-      <div className="fixed right-0 top-0 bottom-0 w-24 z-10">
+      <div className="fixed right-0 top-0 bottom-0 w-48 z-10">
         <TimelineRuler
           data={timelineData}
           onDateClick={handleDateClick}
