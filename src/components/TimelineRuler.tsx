@@ -72,6 +72,39 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
     return 1; // No magnification outside 5-day window
   };
 
+  // Calculate offset to keep focus point stable
+  const getFocusOffset = (entryDate: string, focusDate: string | null): number => {
+    if (!focusDate) return 0;
+    
+    const entryTime = new Date(entryDate).getTime();
+    const focusTime = new Date(focusDate).getTime();
+    
+    // If this is the focus point, no offset
+    if (entryDate === focusDate) return 0;
+    
+    // Calculate how much this entry should be offset to keep focus stable
+    const timeDiff = entryTime - focusTime;
+    const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+    
+    // Only apply offset to entries within the magnification window
+    if (Math.abs(daysDiff) <= 5) {
+      const magnification = getMagnificationFactor(entryDate, focusDate);
+      const baseHeight = 8;
+      const magnifiedHeight = baseHeight * magnification;
+      const extraHeight = magnifiedHeight - baseHeight;
+      
+      // If this entry is before the focus point, push it up
+      if (timeDiff > 0) {
+        return -extraHeight / 2;
+      } else {
+        // If this entry is after the focus point, push it down
+        return extraHeight / 2;
+      }
+    }
+    
+    return 0;
+  };
+
   return (
     <div className="relative w-24 bg-gray-50 border-l-2 border-gray-300 h-screen overflow-y-auto shadow-lg">
       {/* Real-time date display on hover - positioned adjacent to timeline */}
@@ -112,6 +145,8 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
           const isCurrent = currentDate === entry.date;
           const isHovered = hoveredDate === entry.date;
           const entryIsRecent = isRecent(entry.date);
+          const isFocusPoint = focusDate === entry.date;
+          const focusOffset = getFocusOffset(entry.date, focusDate);
 
           // Calculate bar dimensions with magnification
           const baseHeight = 8;
@@ -123,7 +158,9 @@ export function TimelineRuler({ data, onDateClick, currentDate }: TimelineRulerP
               className="relative group cursor-pointer transition-all duration-700 ease-in-out"
               style={{
                 height: `${magnifiedHeight}px`,
-                marginBottom: index < sortedEntries.length - 1 ? '4px' : '0px'
+                marginBottom: index < sortedEntries.length - 1 ? '4px' : '0px',
+                // Apply offset to keep focus point stable
+                transform: `translateY(${focusOffset}px)`
               }}
               onClick={() => {
                 setFocusDate(entry.date);
